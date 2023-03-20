@@ -6,6 +6,12 @@
   - [Setup nodes](#setup-nodes)
   - [Install Kubernetes](#install-kubernetes)
   - [Network plugin](#network-plugin)
+  - [Taint master nodes](#taint-master-nodes)
+- [Other components](#other-components)
+  - [Helm](#helm)
+  - [NVIDIA integration](#nvidia-integration)
+  - [Prometheus and Grafana](#prometheus-and-grafana)
+    - [NVIDIA exporter](#nvidia-exporter)
 - [References](#references)
 
 ## Installation
@@ -71,6 +77,17 @@ The following steps are done on every node.
 
   ```bash
   apt update -y && apt install -y containerd.io
+  ```
+
+- Configure containerd
+
+  ```bash
+  containerd config default | tee /etc/containerd/config.toml
+  ```
+
+  Edit the configuration with any editor. Under the section `[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options]` change the value for `SystemdCgroup` from `false` to `true`. Then:
+  
+  ```bash
   systemctl daemon-reload
   systemctl restart containerd
   systemctl enable --now containerd
@@ -141,6 +158,170 @@ kubectl apply -f https://github.com/flannel-io/flannel/releases/latest/download/
 
 Now the cluster is set up and it can verified with the commands listed above.
 
+If some nodes are still not ready, run in a shell on those machines:
+
+```bash
+sudo systemctl restart containerd kubelet
+```
+
+### Taint master nodes
+
+By default K8s doesn't run pods on master nodes. If this is not the wanted behaviour, the following command allow pods to be scheduled on masters too:
+
+```bash
+kubectl taint node --all node-role.kubernetes.io/control-plane-
+```
+
+## Other components
+
+Now that the cluster is set up, we need to install other components for our use case.
+
+### Helm
+
+Helm is a package manager for K8s.
+
+The Helm project has an installation script that automates the installation:
+
+```bash
+curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+chmod 700 get_helm.sh
+./get_helm.sh
+```
+
+### NVIDIA integration
+
+K8s doesn't allow scheduling GPUs but this is delegated to vendor's plugins. Instructions for NVIDIA:
+
+- Install container toolkit
+
+  ```bash
+  distribution=$(. /etc/os-release;echo $ID$VERSION_ID)
+  curl -s -L https://nvidia.github.io/libnvidia-container/gpgkey | sudo apt-key add -
+  curl -s -L https://nvidia.github.io/libnvidia-container/$distribution/libnvidia-container.list | sudo tee /etc/apt/sources.list.d/libnvidia-container.list
+
+  sudo apt-get update && sudo apt-get install -y nvidia-container-toolkit
+  ```
+
+- Set nvidia as container runtime: open `/etc/containerd/config.toml` and under `[plugins."io.containerd.grpc.v1.cri".containerd]` section change `default_runtime_name` to `"nvidia"`
+  
+  ```toml
+  [plugins."io.containerd.grpc.v1.cri".containerd]
+      default_runtime_name = "nvidia"
+  ```
+
+  and under the section `[plugins."io.containerd.grpc.v1.cri".containerd.runtimes]` add the following
+
+  ```toml
+  [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.nvidia]
+    privileged_without_host_devices = false
+    runtime_engine = ""
+    runtime_root = ""
+    runtime_type = "io.containerd.runc.v2"
+    [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.nvidia.options]
+      BinaryName = "/usr/bin/nvidia-container-runtime"
+  ```
+
+- Restart containerd
+
+  ```shell
+  sudo systemctl restart containerd
+  ```
+
+- ```shell
+  helm repo add nvdp https://nvidia.github.io/k8s-device-plugin
+  helm repo update
+
+  helm upgrade -i nvdp nvdp/nvidia-device-plugin --namespace nvidia-device-plugin --create-namespace --set gfd.enabled=true
+  ```
+
+Now GPU should be avaiable in the cluster. For quickly seeing how many gpus are available, run the command
+
+```shell
+kubectl get nodes -o json | jq .items[].status.allocatable
+```
+
+It should print something like this
+
+```json
+{
+  ...
+  "nvidia.com/gpu": "2",
+  ...
+}
+{
+  ...
+  "nvidia.com/gpu": "1",
+  ...
+}
+```
+
+We can see that in this example there are 2 nodes in the cluster, one with 2 gpus and another with 1.
+
+To test if it actually works, we can check the drivers with the following
+
+```shell
+cat <<EOF | kubectl apply -f -
+apiVersion: v1
+kind: Pod
+metadata:
+  name: gpu-pod
+spec:
+  restartPolicy: Never
+  containers:
+    - name: cuda-container
+      image: nvcr.io/nvidia/k8s/cuda-sample:vectoradd-cuda10.2
+      resources:
+        limits:
+          nvidia.com/gpu: 1 # requesting 1 GPU
+EOF
+```
+
+After getting the logs there should be a success message:
+
+```shell
+kubectl logs gpu-pod
+
+[Vector addition of 50000 elements]
+Copy input data from the host memory to the CUDA device
+CUDA kernel launch with 196 blocks of 256 threads
+Copy output data from the CUDA device to the host memory
+Test PASSED
+Done
+```
+
+The pod can now be deleted
+
+```shell
+kubectl delete pod gpu-pod
+```
+
+### Prometheus and Grafana
+
+Prometheus is the state of the art in monitoring K8s clusters, and it ships well with the data visualization tool Grafana which provides dashboards to quickly visualize Prometheus data.
+
+With helm, installing all the monitoring stack is as easy as running the following commands
+```shell
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo update
+
+helm install prometheus prometheus-community/kube-prometheus-stack -n prometheus --create-namespace
+```
+
+In order to access grafana a port-forward command needs to be running:
+
+```shell
+kubectl port-forward svc/prometheus-grafana 3000:80 -n prometheus
+```
+
+Now grafana can be accessed through a web browser at `localhost:3000` until the command is stopped with `Ctrl-C`.
+
+The default admin user is `admin` with password `prom-operator`.
+
+#### NVIDIA exporter
+
+In order to visualize data about GPUs, additional steps need to be done.
+
+
 ## References
 
 - [NERC Project](https://nerc-project.github.io/nerc-docs/other-tools/kubernetes/kubeadm/single-master-clusters-with-kubeadm/)
@@ -148,7 +329,8 @@ Now the cluster is set up and it can verified with the commands listed above.
 - [Flannel CNI](https://github.com/flannel-io/flannel)
 - [Helm docs](https://helm.sh/docs/)
 - [NVIDIA integration](https://github.com/NVIDIA/k8s-device-plugin)
+- [Prometheus chart](https://artifacthub.io/packages/helm/prometheus-community/kube-prometheus-stack)
+- [NVIDIA Prometheus exporter](https://docs.nvidia.com/datacenter/cloud-native/gpu-telemetry/dcgm-exporter.html)
 - [NFS Ubuntu](https://ubuntu.com/server/docs/service-nfs)
 - [NFS Kubernetes integration](https://github.com/kubernetes-sigs/nfs-subdir-external-provisioner/blob/master/charts/nfs-subdir-external-provisioner/README.md)
 - [Tensorflow training operator](https://github.com/kubeflow/training-operator)
-- [Multi-worker training](https://www.tensorflow.org/tutorials/distribute/multi_worker_with_keras)
