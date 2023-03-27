@@ -9,9 +9,11 @@
   - [Taint master nodes](#taint-master-nodes)
 - [Other components](#other-components)
   - [Helm](#helm)
+  - [Default storage](#default-storage)
   - [NVIDIA integration](#nvidia-integration)
   - [Prometheus and Grafana](#prometheus-and-grafana)
     - [NVIDIA exporter](#nvidia-exporter)
+  - [Tensorflow training operator](#tensorflow-training-operator)
 - [References](#references)
 
 ## Installation
@@ -188,6 +190,10 @@ chmod 700 get_helm.sh
 ./get_helm.sh
 ```
 
+### Default storage
+
+TODO, move to CephFS
+
 ### NVIDIA integration
 
 K8s doesn't allow scheduling GPUs but this is delegated to vendor's plugins. Instructions for NVIDIA:
@@ -299,12 +305,25 @@ kubectl delete pod gpu-pod
 
 Prometheus is the state of the art in monitoring K8s clusters, and it ships well with the data visualization tool Grafana which provides dashboards to quickly visualize Prometheus data.
 
-With helm, installing all the monitoring stack is as easy as running the following commands
+By default, Grafana doesn't persist data, including users and dashboards. To activate persistence, create a file (`prometheus-values.yaml` in this example) with the following content:
+
+```yaml
+grafana:
+  deploymentStrategy:
+    type: Recreate
+  persistence:
+    enabled: true
+  initChownData:
+    enabled: false
+```
+
+then install the monitoring stack with
+
 ```shell
 helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
 helm repo update
 
-helm install prometheus prometheus-community/kube-prometheus-stack -n prometheus --create-namespace
+helm install prometheus prometheus-community/kube-prometheus-stack -n prometheus --create-namespace -f prometheus-values.yaml
 ```
 
 In order to access grafana a port-forward command needs to be running:
@@ -319,8 +338,49 @@ The default admin user is `admin` with password `prom-operator`.
 
 #### NVIDIA exporter
 
-In order to visualize data about GPUs, additional steps need to be done.
+In order to visualize data about GPUs, a few additional steps need to be done.
 
+Nvidia provides an exporter for Prometheus but by default it is not activated. In order to activate it, we'll need to set some parameters. Create a yaml file (in this example `nvidia-exporter.yaml`) with the following content:
+
+```yaml
+serviceMonitor:
+  enabled: true
+  interval: 1s
+  additionalLabels:
+    release: prometheus
+```
+
+Then we can install the exporter with the commands:
+
+```shell
+helm repo add gpu-helm-charts https://nvidia.github.io/dcgm-exporter/helm-charts
+helm repo update
+
+helm install --generate-name gpu-helm-charts/dcgm-exporter -n nvidia-exporter -f nvidia-exporter.yaml
+```
+
+With `kubectl get pods -n nvidia-exporter` we can check the status of the pods we just created.
+
+Now it's time to create a dashboard in Grafana to actually show this data. In Grafana navigate to the import dashboard section:
+![Import](./images/dashboard_import.png)
+
+Then in the "Import via grafana.com" field paste the following link and click load
+
+```url
+https://grafana.com/grafana/dashboards/12239
+```
+
+and then make sure that the "Prometheus" data source is selected on the last field.
+
+### Tensorflow training operator
+
+Tensorflow has a builtin multi-worker strategy that can be used to train a machine learning model on multiple machines. In Kubernetes the whole setup to make this work is made easier using Kubeflow training operators, which include a specific one for Tensorflow.
+
+Only one command is needed for installing it:
+
+```shell
+kubectl apply -k "github.com/kubeflow/training-operator/manifests/overlays/standalone?ref=v1.6.0"
+```
 
 ## References
 
@@ -330,7 +390,7 @@ In order to visualize data about GPUs, additional steps need to be done.
 - [Helm docs](https://helm.sh/docs/)
 - [NVIDIA integration](https://github.com/NVIDIA/k8s-device-plugin)
 - [Prometheus chart](https://artifacthub.io/packages/helm/prometheus-community/kube-prometheus-stack)
-- [NVIDIA Prometheus exporter](https://docs.nvidia.com/datacenter/cloud-native/gpu-telemetry/dcgm-exporter.html)
+- [NVIDIA Prometheus exporter](https://docs.nvidia.com/datacenter/cloud-native/gpu-telemetry/dcgm-exporter.html#integrating-gpu-telemetry-into-kubernetes)
 - [NFS Ubuntu](https://ubuntu.com/server/docs/service-nfs)
 - [NFS Kubernetes integration](https://github.com/kubernetes-sigs/nfs-subdir-external-provisioner/blob/master/charts/nfs-subdir-external-provisioner/README.md)
 - [Tensorflow training operator](https://github.com/kubeflow/training-operator)
