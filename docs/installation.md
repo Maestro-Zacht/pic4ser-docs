@@ -362,7 +362,7 @@ helm install --generate-name gpu-helm-charts/dcgm-exporter -n nvidia-exporter -f
 With `kubectl get pods -n nvidia-exporter` we can check the status of the pods we just created.
 
 Now it's time to create a dashboard in Grafana to actually show this data. In Grafana navigate to the import dashboard section:
-![Import](./images/dashboard_import.png)
+![Import](./images/installation/dashboard_import.png)
 
 Then in the "Import via grafana.com" field paste the following link and click load
 
