@@ -15,6 +15,7 @@
   - [Secrets and ConfigMaps](#secrets-and-configmaps)
     - [Secret example](#secret-example)
     - [ConfigMap example](#configmap-example)
+  - [Tensorflow Jobs](#tensorflow-jobs)
 
 ## References
 
@@ -360,16 +361,16 @@ spec:
         - name: nginx-container
           image: nginx
           env:
-          - name: USERNAME_VAR
-            valueFrom:
-              secretKeyRef:
-                name: test-secret
-                key: username
-          - name: PASSWORD_VAR
-            valueFrom:
-              secretKeyRef:
-                name: test-secret
-                key: password
+            - name: USERNAME_VAR
+              valueFrom:
+                secretKeyRef:
+                  name: test-secret
+                  key: username
+            - name: PASSWORD_VAR
+              valueFrom:
+                secretKeyRef:
+                  name: test-secret
+                  key: password
 ```
 
 This example creates a secret with 2 key-value pairs and a pod that mounts the secret as environment variables. The values in secrets are base64 encoded.
@@ -459,16 +460,16 @@ spec:
         - name: nginx-container
           image: nginx
           env:
-          - name: KEY1_VAR
-            valueFrom:
-              configMapKeyRef:
-                name: test-configmap
-                key: key1
-          - name: KEY2_VAR
-            valueFrom:
-              configMapKeyRef:
-                name: test-configmap
-                key: key2
+            - name: KEY1_VAR
+              valueFrom:
+                configMapKeyRef:
+                  name: test-configmap
+                  key: key1
+            - name: KEY2_VAR
+              valueFrom:
+                configMapKeyRef:
+                  name: test-configmap
+                  key: key2
           volumeMounts:
             - name: configmap-volume
               mountPath: /etc/configmap-volume
@@ -479,3 +480,7 @@ spec:
 ```
 
 ConfigMaps are the same as Secrets but they are not base64 encoded. They can be used to store configuration files or key-value pairs.
+
+### Tensorflow Jobs
+
+

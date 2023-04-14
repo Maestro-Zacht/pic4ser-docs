@@ -117,7 +117,7 @@ Now the cluster needs to be created. A first master endpoint needs to be chosen,
 On this master node run the init command:
 
 ```bash
-kubeadm init --pod-network-cidr=10.244.0.0/16 --control-plane-endpoint="bonnie.polito.it" --upload-certs
+kubeadm init --pod-network-cidr=10.244.0.0/16
 ```
 
 At the end of the output there are 2 other commands that need to be copy-pasted: one is for making the `kubectl` command avaiable for the user and one (actually two) for joining other nodes. The first is run on the master to make the command available for root user. It looks like this:
@@ -356,7 +356,7 @@ Then we can install the exporter with the commands:
 helm repo add gpu-helm-charts https://nvidia.github.io/dcgm-exporter/helm-charts
 helm repo update
 
-helm install --generate-name gpu-helm-charts/dcgm-exporter -n nvidia-exporter -f nvidia-exporter.yaml
+helm install --generate-name gpu-helm-charts/dcgm-exporter -n nvidia-exporter --create-namespace -f nvidia-exporter.yaml
 ```
 
 With `kubectl get pods -n nvidia-exporter` we can check the status of the pods we just created.
