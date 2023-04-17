@@ -192,11 +192,21 @@ chmod 700 get_helm.sh
 
 ### Default storage
 
-TODO, move to CephFS
+Data persistence is not provided by default in K8s. In order to have it, a default storage class needs to be created. This class will provide storage from a physical volume that needs to be provided by the cluster administrator. We chose to use a NFS server mainly for allowing the data to be accessible from all the hosts. The NFS server is installed on the machine called Kitt. on the path `/export/kubernetes`.
+
+In order to make the NFS server available to the cluster, the following command needs to be run on the master node:
+
+```bash
+helm repo add nfs-subdir-external-provisioner https://kubernetes-sigs.github.io/nfs-subdir-external-provisioner/
+
+helm install nfs-subdir-external-provisioner nfs-subdir-external-provisioner/nfs-subdir-external-provisioner --set nfs.server=kitt2.polito.it --set nfs.path=/export/kubernetes --set storageClass.defaultClass=true
+```
+
+Now every PersistentVolumeClaim created in the cluster will be satisfied by the NFS server.
 
 ### NVIDIA integration
 
-K8s doesn't allow scheduling GPUs but this is delegated to vendor's plugins. Instructions for NVIDIA:
+K8s doesn't allow scheduling GPUs out-of-the-box but this is delegated to vendor's plugins. Instructions for NVIDIA:
 
 - Install container toolkit
 
