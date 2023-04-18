@@ -333,29 +333,32 @@ Here the things to note are:
 Provided there is an NFS server already running, the following yaml file will create a pod that mounts a directory on the NFS server.
 
 ```yaml
-apiVersion: v1
-kind: Pod
+apiVersion: apps/v1
+kind: Deployment
 metadata:
-  name: ubuntu
-  labels:
-    app: ubuntu
+  name: test-nginx          # deployment name
 spec:
-  containers:
-    - image: ubuntu
-      command:
-        - "sleep"
-        - "604800"
-      imagePullPolicy: IfNotPresent
-      name: ubuntu
-      volumeMounts:
+  replicas: 1               # number of pods to be created
+  selector:
+    matchLabels:
+      app: nginx-test       # pod label to match
+  template:
+    metadata:
+      labels:
+        app: nginx-test     # pod label to be matched
+    spec:
+      containers:
+        - name: nginx-container
+          image: nginx
+          volumeMounts:     # volume mount into container
+            - name: nfs-test
+                            # mount path in container
+              mountPath: /mnt/test
+      volumes:              # volume mount into pod
         - name: nfs-test
-          mountPath: /mnt/nfs
-  restartPolicy: Always
-  volumes:
-    - name: nfs-test
-      nfs:
-        server: kitt2.polito.it
-        path: /export/kubernetes/test
+          nfs:
+            server: kitt2.polito.it # NFS server
+            path: /export/kubernetes/test # path on the NFS server
 ```
 
 ### Secrets and ConfigMaps
