@@ -12,6 +12,7 @@
   - [Volumes](#volumes)
     - [HostPath example](#hostpath-example)
     - [PersistentVolumeClaim example](#persistentvolumeclaim-example)
+    - [NFS example](#nfs-example)
   - [Secrets and ConfigMaps](#secrets-and-configmaps)
     - [Secret example](#secret-example)
     - [ConfigMap example](#configmap-example)
@@ -236,15 +237,15 @@ This will create a ClusterIP service which is also accessible from the ip `x.x.x
 
 Volumes are used to store data in a pod. There are 3 types of volumes:
 
-- EmptyDir: A temporary directory that shares a pod’s lifetime.
 - HostPath: A directory on the host node’s filesystem.
 - PersistentVolumeClaim: A request for storage by a user.
+- NFS: A directory on a NFS server.
 
-The last two are used to persist data across pod restarts.
 The first one mounts a directory on the host into the pod. This is similar to how Docker mounts volumes but since Kubernetes schedules pods on different nodes, the directory will be the one on the node the pod is running on. This means that if the pod is restarted on a different node, the data will be lost on the pod point of view.
 The second one is used to request storage space from a previously defined volume or storage class such as a NFS server.
+The third one is used to mount a directory on a NFS server into the pod. This is similar to the first one but the directory is on a NFS server.
 
-Both of these types have a use. The first one is useful to mount large quantities of files stored in directories into pods, such as training data for machine learning. The second one is useful to store applicatio data that needs to be persistent across pod restarts, such as Grafana database.
+Each of these types have a use. The first one is useful to mount large quantities of files stored in directories into pods that are bound to a specific host. The second one is useful to store application data that needs to be persistent across pod restarts, such as Grafana database. The third one is useful to mount directories on a NFS server into pods and we'll use this to mount ML data into pods later.
 
 #### HostPath example
 
@@ -326,6 +327,36 @@ Here the things to note are:
 - The `spec.accessModes` property in the PersistentVolumeClaim definition. This defines how the volume can be accessed. In this case it is `ReadWriteOnce` which means that the volume can be mounted as read-write by a single node. More info on access modes [here](https://kubernetes.io/docs/concepts/storage/persistent-volumes/#access-modes).
 - The `spec.resources.requests.storage` property in the PersistentVolumeClaim definition. This defines the size of the volume. In this case it is 1Gi.
 - The pod volume mount has `persistentVolumeClaim` volume definition with the `claimName` property set to the name of the PersistentVolumeClaim.
+
+#### NFS example
+
+Provided there is an NFS server already running, the following yaml file will create a pod that mounts a directory on the NFS server.
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ubuntu
+  labels:
+    app: ubuntu
+spec:
+  containers:
+    - image: ubuntu
+      command:
+        - "sleep"
+        - "604800"
+      imagePullPolicy: IfNotPresent
+      name: ubuntu
+      volumeMounts:
+        - name: nfs-test
+          mountPath: /mnt/nfs
+  restartPolicy: Always
+  volumes:
+    - name: nfs-test
+      nfs:
+        server: kitt2.polito.it
+        path: /export/kubernetes/test
+```
 
 ### Secrets and ConfigMaps
 
