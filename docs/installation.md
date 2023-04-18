@@ -1,4 +1,8 @@
-# INSTALLATION <!-- omit in toc -->
+---
+title: Installation
+---
+
+# Installation <!-- omit in toc -->
 
 ## Contents <!-- omit in toc -->
 
