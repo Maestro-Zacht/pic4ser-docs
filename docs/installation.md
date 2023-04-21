@@ -1,10 +1,11 @@
 ---
 title: Installation
+layout: default
 ---
 
 # Installation <!-- omit in toc -->
 
-[⬅️ Back to index](.)
+[⬅️ Back to index](index.md)
 ## Contents <!-- omit in toc -->
 
 - [Installation](#installation)
