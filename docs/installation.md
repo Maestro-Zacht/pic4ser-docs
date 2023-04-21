@@ -1,5 +1,10 @@
-# INSTALLATION <!-- omit in toc -->
+---
+title: Installation
+---
 
+# Installation <!-- omit in toc -->
+
+[⬅️ Back to index](.)
 ## Contents <!-- omit in toc -->
 
 - [Installation](#installation)
