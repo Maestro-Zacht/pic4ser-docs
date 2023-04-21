@@ -28,6 +28,8 @@ domain: pic4ser-kubernetes.github.io
 baseurl: "/pic4ser-docs" # the subpath of your site, e.g. /blog
 url: "https://pic4ser-kubernetes.github.io" # the base hostname & protocol for your site, e.g. http://example.com
 
+permalink: pretty
+
 # Build settings
 remote_theme: pages-themes/cayman@v0.2.0
 plugins:

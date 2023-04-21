@@ -1,5 +1,7 @@
 # Kubernetes guide <!-- omit in toc -->
 
+[⬅️ Back to index](.)
+
 ## Contents <!-- omit in toc -->
 
 - [References](#references)
